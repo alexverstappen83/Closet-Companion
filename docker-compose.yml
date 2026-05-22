@@ -1,6 +1,7 @@
 services:
-  web:
+  app1-web:
     build: .
+    image: app1-web
     container_name: app1-web
     restart: unless-stopped
     env_file:
