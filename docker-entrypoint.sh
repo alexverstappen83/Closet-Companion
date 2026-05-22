@@ -2,7 +2,7 @@
 set -e
 
 echo "[entrypoint] Synchronising database schema..."
-npx prisma db push --skip-generate
+node node_modules/prisma/build/index.js db push --skip-generate
 
 echo "[entrypoint] Starting application..."
 exec "$@"

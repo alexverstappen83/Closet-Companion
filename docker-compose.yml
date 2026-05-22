@@ -5,6 +5,12 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    # Migreert het schema en start daarna de server. Roept de Prisma CLI
+    # rechtstreeks aan, zodat geen npx-shim in het runtime-image nodig is.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - node node_modules/prisma/build/index.js db push --skip-generate && exec node server.js
     volumes:
       - /data/app1/uploads:/data/app1/uploads
       - /data/app1/generated:/data/app1/generated
