@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum AiTaskType {
+  CLOTHING_RECOGNITION
+  CLOSET_ORGANIZATION
+  STYLE_ADVICE
+  OUTFIT_IMAGE_GENERATION
+}
+
+enum AiUsageStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  BLOCKED_BY_BUDGET
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  role         UserRole @default(USER)
+  isActive     Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clothingItems   ClothingItem[]
+  referencePhotos ReferencePhoto[]
+  outfits         Outfit[]
+  generatedImages GeneratedOutfitImage[]
+  aiUsageLogs     AiUsageLog[]
+}
+
+model ClothingItem {
+  id   String @id @default(cuid())
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  name         String
+  mainCategory String
+  subCategory  String?
+  colors       String[]
+  pattern      String?
+  seasons      String[]
+  formality    String?
+  styleTags    String[]
+  occasions    String[]
+  notes        String?
+
+  imagePath    String
+  originalName String?
+  mimeType     String?
+
+  aiStatus      String?
+  aiRawResponse Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  outfitItems OutfitItem[]
+
+  @@index([userId])
+}
+
+model ReferencePhoto {
+  id   String @id @default(cuid())
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  imagePath    String
+  originalName String?
+  mimeType     String?
+
+  isPrimary Boolean @default(false)
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  generatedImages GeneratedOutfitImage[]
+
+  @@index([userId])
+}
+
+model Outfit {
+  id   String @id @default(cuid())
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  name        String
+  description String?
+  occasion    String?
+  styleTags   String[]
+  isFavorite  Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items           OutfitItem[]
+  generatedImages GeneratedOutfitImage[]
+
+  @@index([userId])
+}
+
+model OutfitItem {
+  id String @id @default(cuid())
+
+  outfit   Outfit @relation(fields: [outfitId], references: [id], onDelete: Cascade)
+  outfitId String
+
+  clothingItem   ClothingItem @relation(fields: [clothingItemId], references: [id], onDelete: Cascade)
+  clothingItemId String
+
+  layerType String?
+  sortOrder Int     @default(0)
+
+  @@index([outfitId])
+  @@index([clothingItemId])
+}
+
+model GeneratedOutfitImage {
+  id   String @id @default(cuid())
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  outfit   Outfit? @relation(fields: [outfitId], references: [id], onDelete: SetNull)
+  outfitId String?
+
+  referencePhoto   ReferencePhoto? @relation(fields: [referencePhotoId], references: [id], onDelete: SetNull)
+  referencePhotoId String?
+
+  imagePath        String
+  promptVersion    String?
+  openAiModel      String?
+  estimatedCostUsd Decimal? @db.Decimal(10, 6)
+
+  status       String
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model AiUsageLog {
+  id   String @id @default(cuid())
+  user User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  taskType AiTaskType
+  provider String     @default("openai")
+  model    String
+
+  inputTokens      Int?
+  outputTokens     Int?
+  totalTokens      Int?
+  imageCount       Int?
+  estimatedCostUsd Decimal  @db.Decimal(10, 6)
+  finalCostUsd     Decimal? @db.Decimal(10, 6)
+
+  relatedClothingId String?
+  relatedOutfitId   String?
+  relatedImageId    String?
+
+  status       AiUsageStatus
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}
