@@ -5,12 +5,13 @@ services:
     restart: unless-stopped
     env_file:
       - .env
-    ports:
-      # Alleen bereikbaar via de lokale reverse proxy (Caddy), niet publiek.
-      - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:
       - /data/app1/uploads:/data/app1/uploads
       - /data/app1/generated:/data/app1/generated
+    networks:
+      # 'edge' = gedeeld netwerk met mamuth-caddy; 'default' = privé voor de DB.
+      - default
+      - edge
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,8 +26,18 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     volumes:
       - /data/app1/postgres:/var/lib/postgresql/data
+    networks:
+      - default
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-app_user} -d ${POSTGRES_DB:-app1}"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+networks:
+  # Bestaand netwerk van de mamuth-caddy reverse proxy (extern beheerd).
+  edge:
+    external: true
+  # Privénetwerk voor verkeer tussen de app en de database.
+  default:
+    driver: bridge
