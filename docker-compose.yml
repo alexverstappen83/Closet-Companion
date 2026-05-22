@@ -6,7 +6,8 @@ services:
     env_file:
       - .env
     ports:
-      - "3000:3000"
+      # Alleen bereikbaar via de lokale reverse proxy (Caddy), niet publiek.
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:
       - /data/app1/uploads:/data/app1/uploads
       - /data/app1/generated:/data/app1/generated
