@@ -254,61 +254,106 @@ export async function generateStyleAdvice(params: {
   return { advice, usage };
 }
 
-/** Genereert een outfitvisualisatie op de referentiefoto van de gebruiker. */
+export interface VisualizationImage {
+  buffer: Buffer;
+  mimeType: string;
+}
+
+export interface VisualizationItem extends VisualizationImage {
+  description: string;
+}
+
+/** Genereert een outfitvisualisatie op basis van referentiefoto's én de
+ *  daadwerkelijke foto's van de kledingstukken. Door de kledingfoto's mee te
+ *  sturen reproduceert het model logo's, prints en kleuren veel trouwer. */
 export async function generateOutfitVisualization(params: {
-  referenceImage: Buffer;
-  referenceMimeType: string;
-  itemDescriptions: string[];
+  referenceImages: VisualizationImage[];
+  clothingItems: VisualizationItem[];
   context?: string;
 }): Promise<{ image: Buffer; usage: AiUsage }> {
   const openai = client();
   const model = config.openai.imageModel;
 
-  const itemsList = params.itemDescriptions
-    .map((entry, index) => `  ${index + 1}. ${entry}`)
+  const referenceCount = params.referenceImages.length;
+  const itemsCount = params.clothingItems.length;
+  if (referenceCount === 0) {
+    throw new Error("Er is geen referentiefoto om de persoon op te baseren.");
+  }
+  if (itemsCount === 0) {
+    throw new Error("Er zijn geen kledingstukken om te visualiseren.");
+  }
+
+  const itemsList = params.clothingItems
+    .map(
+      (item, index) =>
+        `  ${index + 1}. (foto ${referenceCount + index + 1}) ${item.description}`,
+    )
     .join("\n");
 
+  const refRange =
+    referenceCount === 1 ? "foto 1" : `foto 1 t/m ${referenceCount}`;
+  const itemsStart = referenceCount + 1;
+  const itemsEnd = referenceCount + itemsCount;
+  const itemsRange =
+    itemsCount === 1
+      ? `foto ${itemsStart}`
+      : `foto ${itemsStart} t/m ${itemsEnd}`;
+
   const prompt = [
-    "Taak: maak een nieuwe realistische foto van dezelfde persoon, die nu uitsluitend",
-    "de hieronder beschreven outfit draagt. De bestaande foto is alléén bedoeld om",
-    "het uiterlijk en de pose van de persoon vast te leggen — niet als kledingreferentie.",
+    `Je krijgt ${referenceCount + itemsCount} foto's mee, in deze volgorde:`,
+    `- ${refRange}: PERSOON-foto's.`,
+    `- ${itemsRange}: KLEDING-foto's (één foto per kledingstuk).`,
     "",
-    "GEBRUIK UITSLUITEND uit de bestaande foto:",
-    "- het gezicht, het kapsel, de huidskleur en lichaamsverhoudingen van de persoon",
+    `Uit de PERSOON-foto's (${refRange}) gebruik je UITSLUITEND:`,
+    "- het gezicht, kapsel, huidskleur en lichaamsverhoudingen van de persoon",
     "- de pose, lichaamshouding en stand van de handen",
     "- de achtergrond, het kader, de belichting en de fotostijl",
+    "Negeer de kleding die op deze foto's te zien is volledig — neem geen logo's,",
+    "kleuren, patronen of merken van die kleding over.",
     "",
-    "VERVANG VOLLEDIG (negeer wat op de oorspronkelijke foto te zien is):",
-    "- elk kledingstuk, accessoire, schoeisel en hoofddeksel",
-    "- ALLE logo's, prints, merken, opdruk, tekst, badges, patronen, kleuren,",
-    "  texturen en stofdetails van de huidige kleding mogen NIET in het resultaat",
-    "  voorkomen. Geen enkel detail van de bestaande kleding wordt overgenomen.",
+    `Uit de KLEDING-foto's (${itemsRange}) reproduceer je van elk kledingstuk EXACT:`,
+    "- de kleur(en) en kleurverhoudingen",
+    "- alle patronen, prints, logo's, merken, tekst, badges en grafische details",
+    "- de stof, structuur, glans en kleine details (knopen, naden, zakken)",
+    "Pas alleen de pasvorm en val aan op het lichaam en de pose van de persoon.",
+    "Verzin geen extra logo's of prints — neem alleen wat zichtbaar is op de foto's.",
     "",
-    "De nieuwe outfit bestaat uit precies deze stukken (en niets anders):",
+    "De outfit bestaat uit precies deze kledingstukken (per item de bijbehorende foto):",
     itemsList,
     "",
-    "Tenzij hierboven expliciet vermeld zijn de kledingstukken egaal, zónder logo's,",
-    "merknamen, opdruk, tekst of grafische prints. Voeg geen kleding of accessoires toe",
-    "die niet in de lijst staan.",
+    "Voeg geen kleding of accessoires toe die niet in deze lijst staan.",
     params.context
       ? `Gelegenheid waar deze outfit voor bedoeld is: ${params.context}.`
       : "",
     "",
-    "Resultaat: één natuurlijke, fotorealistische afbeelding van dezelfde persoon in",
-    "deze outfit, met realistische pasvorm, val en belichting. Geen visuele resten",
-    "van de oorspronkelijke kleding.",
+    "Resultaat: één natuurlijke fotorealistische afbeelding van dezelfde persoon",
+    "in deze outfit, met realistische pasvorm en natuurlijke belichting. Geen",
+    "visuele resten van de oorspronkelijke kleding uit de persoon-foto's.",
   ]
     .filter(Boolean)
     .join("\n");
 
-  const ext = params.referenceMimeType.includes("png") ? "png" : "jpg";
-  const referenceFile = await toFile(params.referenceImage, `reference.${ext}`, {
-    type: params.referenceMimeType,
-  });
+  const toUpload = async (img: VisualizationImage, name: string) => {
+    const ext = img.mimeType.includes("png")
+      ? "png"
+      : img.mimeType.includes("webp")
+        ? "webp"
+        : "jpg";
+    return toFile(img.buffer, `${name}.${ext}`, { type: img.mimeType });
+  };
+
+  const referenceFiles = await Promise.all(
+    params.referenceImages.map((img, index) =>
+      toUpload(img, `reference-${index + 1}`),
+    ),
+  );
+  const itemFiles = await Promise.all(
+    params.clothingItems.map((item, index) => toUpload(item, `item-${index + 1}`)),
+  );
 
   const result = await openai.images.edit({
     model,
-    image: referenceFile,
+    image: [...referenceFiles, ...itemFiles],
     prompt,
     size: "1024x1536",
   });

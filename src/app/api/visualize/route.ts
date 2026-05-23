@@ -22,7 +22,8 @@ const bodySchema = z.object({
   outfitId: z.string().trim().min(1),
 });
 
-const PROMPT_VERSION = "v2";
+const PROMPT_VERSION = "v3";
+const MAX_REFERENCE_PHOTOS = 4;
 
 function describeItem(item: {
   name: string;
@@ -74,18 +75,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const primary = await prisma.referencePhoto.findFirst({
-    where: { userId: user.id, isPrimary: true },
+  const refPhotos = await prisma.referencePhoto.findMany({
+    where: { userId: user.id },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
+    take: MAX_REFERENCE_PHOTOS,
   });
-  if (!primary) {
+  if (refPhotos.length === 0) {
     return Response.json(
       {
         error:
-          "Je hebt nog geen primaire referentiefoto. Upload er één bij Referentiefoto's.",
+          "Je hebt nog geen referentiefoto's. Upload er minimaal één bij Referentiefoto's.",
       },
       { status: 400 },
     );
   }
+  const primary = refPhotos.find((entry) => entry.isPrimary) ?? refPhotos[0];
 
   try {
     await assertWithinBudget(user.id, ESTIMATED_COST.visualization);
@@ -108,13 +112,29 @@ export async function POST(request: NextRequest) {
 
   let generatedId: string | undefined;
   try {
-    const reference = await readImage(primary.imagePath, user.id);
+    const referenceImages = await Promise.all(
+      refPhotos.map(async (photo) => {
+        const { buffer, mimeType } = await readImage(photo.imagePath, user.id);
+        return { buffer, mimeType };
+      }),
+    );
+    const clothingItems = await Promise.all(
+      outfit.items.map(async (entry) => {
+        const { buffer, mimeType } = await readImage(
+          entry.clothingItem.imagePath,
+          user.id,
+        );
+        return {
+          buffer,
+          mimeType,
+          description: describeItem(entry.clothingItem),
+        };
+      }),
+    );
+
     const { image, usage } = await generateOutfitVisualization({
-      referenceImage: reference.buffer,
-      referenceMimeType: reference.mimeType,
-      itemDescriptions: outfit.items.map((entry) =>
-        describeItem(entry.clothingItem),
-      ),
+      referenceImages,
+      clothingItems,
       context: outfit.occasion ?? outfit.name,
     });
 

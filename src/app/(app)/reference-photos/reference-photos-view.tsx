@@ -156,6 +156,8 @@ export function ReferencePhotosView({
               {[
                 "Sta volledig in beeld, van top tot teen",
                 "Schoenen en hoofd zijn zichtbaar",
+                "Draag strak passende kleding zodat de AI je lichaamsvorm en verhoudingen goed kan inschatten",
+                "Upload meerdere foto's (bijv. voor- en zijaanzicht); de AI gebruikt ze allemaal",
                 "Goed belicht en een rustige achtergrond",
                 "Bij voorkeur maar één persoon op de foto",
               ].map((tip) => (
