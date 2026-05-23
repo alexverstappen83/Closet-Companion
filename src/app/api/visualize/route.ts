@@ -11,6 +11,7 @@ import {
   OpenAiNotConfiguredError,
 } from "@/lib/openai";
 import { imageUrl } from "@/lib/image-url";
+import { normalizeForOpenAi } from "@/lib/image-prep";
 import { prisma } from "@/lib/prisma";
 import { readImage, saveBuffer } from "@/lib/storage";
 
@@ -114,19 +115,19 @@ export async function POST(request: NextRequest) {
   try {
     const referenceImages = await Promise.all(
       refPhotos.map(async (photo) => {
-        const { buffer, mimeType } = await readImage(photo.imagePath, user.id);
-        return { buffer, mimeType };
+        const { buffer } = await readImage(photo.imagePath, user.id);
+        return normalizeForOpenAi(buffer);
       }),
     );
     const clothingItems = await Promise.all(
       outfit.items.map(async (entry) => {
-        const { buffer, mimeType } = await readImage(
+        const { buffer } = await readImage(
           entry.clothingItem.imagePath,
           user.id,
         );
+        const normalized = await normalizeForOpenAi(buffer);
         return {
-          buffer,
-          mimeType,
+          ...normalized,
           description: describeItem(entry.clothingItem),
         };
       }),
@@ -172,6 +173,7 @@ export async function POST(request: NextRequest) {
       imageUrl: imageUrl(storedPath),
     });
   } catch (error) {
+    console.error("[visualize] generation failed", error);
     await logAiUsage({
       userId: user.id,
       taskType: AiTaskType.OUTFIT_IMAGE_GENERATION,
