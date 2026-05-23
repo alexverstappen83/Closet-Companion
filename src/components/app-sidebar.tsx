@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Shirt } from "lucide-react";
 
+import { Logo } from "@/components/logo";
 import { adminNavItem, navItems, type NavItem } from "@/components/nav-items";
 import { SignOutButton } from "@/components/sign-out-button";
 import { cn } from "@/lib/utils";
@@ -43,10 +43,10 @@ export function AppSidebar({
     <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r bg-card lg:flex">
       <div className="flex items-center gap-2.5 px-5 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <Shirt className="h-5 w-5" />
+          <Logo className="h-5 w-5" />
         </div>
         <div className="leading-tight">
-          <p className="text-sm font-semibold">Closet Companion</p>
+          <p className="text-sm font-semibold">My Wardrobe</p>
           <p className="text-xs text-muted-foreground">Digitale kledingkast</p>
         </div>
       </div>
