@@ -22,18 +22,24 @@ const bodySchema = z.object({
   outfitId: z.string().trim().min(1),
 });
 
-const PROMPT_VERSION = "v1";
+const PROMPT_VERSION = "v2";
 
 function describeItem(item: {
   name: string;
   mainCategory: string;
+  subCategory: string | null;
   colors: string[];
   pattern: string | null;
+  formality: string | null;
+  notes: string | null;
 }): string {
   const parts = [item.name];
+  parts.push(`type: ${item.subCategory ?? item.mainCategory}`);
   if (item.colors.length) parts.push(`kleur: ${item.colors.join(", ")}`);
-  if (item.pattern) parts.push(`patroon: ${item.pattern}`);
-  return parts.join(", ");
+  parts.push(`patroon: ${item.pattern ?? "egaal, geen prints of logo's"}`);
+  if (item.formality) parts.push(`stijl: ${item.formality}`);
+  if (item.notes) parts.push(`extra: ${item.notes}`);
+  return parts.join("; ");
 }
 
 export async function POST(request: NextRequest) {

@@ -264,14 +264,42 @@ export async function generateOutfitVisualization(params: {
   const openai = client();
   const model = config.openai.imageModel;
 
-  const prompt =
-    "Bewerk deze foto van een persoon zo dat dezelfde persoon de volgende outfit draagt. " +
-    "Behoud het gezicht, de lichaamsbouw, de pose en de achtergrond exact. " +
-    "Vervang uitsluitend de kleding door: " +
-    params.itemDescriptions.join("; ") +
-    ". " +
-    (params.context ? `Gelegenheid: ${params.context}. ` : "") +
-    "Het resultaat moet realistisch en natuurlijk ogen, als een echte foto.";
+  const itemsList = params.itemDescriptions
+    .map((entry, index) => `  ${index + 1}. ${entry}`)
+    .join("\n");
+
+  const prompt = [
+    "Taak: maak een nieuwe realistische foto van dezelfde persoon, die nu uitsluitend",
+    "de hieronder beschreven outfit draagt. De bestaande foto is alléén bedoeld om",
+    "het uiterlijk en de pose van de persoon vast te leggen — niet als kledingreferentie.",
+    "",
+    "GEBRUIK UITSLUITEND uit de bestaande foto:",
+    "- het gezicht, het kapsel, de huidskleur en lichaamsverhoudingen van de persoon",
+    "- de pose, lichaamshouding en stand van de handen",
+    "- de achtergrond, het kader, de belichting en de fotostijl",
+    "",
+    "VERVANG VOLLEDIG (negeer wat op de oorspronkelijke foto te zien is):",
+    "- elk kledingstuk, accessoire, schoeisel en hoofddeksel",
+    "- ALLE logo's, prints, merken, opdruk, tekst, badges, patronen, kleuren,",
+    "  texturen en stofdetails van de huidige kleding mogen NIET in het resultaat",
+    "  voorkomen. Geen enkel detail van de bestaande kleding wordt overgenomen.",
+    "",
+    "De nieuwe outfit bestaat uit precies deze stukken (en niets anders):",
+    itemsList,
+    "",
+    "Tenzij hierboven expliciet vermeld zijn de kledingstukken egaal, zónder logo's,",
+    "merknamen, opdruk, tekst of grafische prints. Voeg geen kleding of accessoires toe",
+    "die niet in de lijst staan.",
+    params.context
+      ? `Gelegenheid waar deze outfit voor bedoeld is: ${params.context}.`
+      : "",
+    "",
+    "Resultaat: één natuurlijke, fotorealistische afbeelding van dezelfde persoon in",
+    "deze outfit, met realistische pasvorm, val en belichting. Geen visuele resten",
+    "van de oorspronkelijke kleding.",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   const ext = params.referenceMimeType.includes("png") ? "png" : "jpg";
   const referenceFile = await toFile(params.referenceImage, `reference.${ext}`, {
