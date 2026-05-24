@@ -33,6 +33,7 @@ const IMAGE_COST_USD = 0.2;
 // Conservatieve vooraframing voor de budgetcontrole vóór een AI-aanroep.
 export const ESTIMATED_COST = {
   recognition: 0.01,
+  outfitRecognition: 0.04,
   advice: 0.015,
   visualization: IMAGE_COST_USD,
 } as const;
@@ -57,6 +58,18 @@ export interface ClothingSuggestion {
   styleTags: string[];
   occasions: string[];
   description: string | null;
+}
+
+export interface OutfitItemSuggestion extends ClothingSuggestion {
+  /** Genormaliseerde bounding box (0-1) waarmee dit kledingstuk uit de foto
+   *  geknipt kan worden. Mogelijk ontbrekend of buiten bereik — dan valt de
+   *  crop-helper terug op de hele foto. */
+  boundingBox: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
 }
 
 export interface StyleAdvice {
@@ -174,6 +187,137 @@ export async function recognizeClothing(
   };
 
   return { suggestion, raw: parsed, usage };
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function parseBoundingBox(value: unknown): OutfitItemSuggestion["boundingBox"] {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const x = asNumber(raw.x);
+  const y = asNumber(raw.y);
+  const width = asNumber(raw.width);
+  const height = asNumber(raw.height);
+  if (x === null || y === null || width === null || height === null) {
+    return null;
+  }
+  return { x, y, width, height };
+}
+
+/** Stuurt één foto met meerdere kledingstukken naar OpenAI en vraagt om een
+ *  lijst van gedetecteerde stukken met metadata én genormaliseerde bounding
+ *  boxes (0-1) die later gebruikt worden om elk kledingstuk uit de foto te
+ *  knippen. */
+export async function recognizeOutfitPhoto(
+  imageBase64: string,
+  mimeType: string,
+): Promise<{
+  items: OutfitItemSuggestion[];
+  raw: unknown;
+  usage: AiUsage;
+}> {
+  const openai = client();
+  const model = config.openai.visionModel;
+
+  const completion = await openai.chat.completions.create({
+    model,
+    response_format: { type: "json_object" },
+    max_tokens: 1500,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Je bent een mode-assistent die een foto van een persoon analyseert en " +
+          "alle zichtbare kledingstukken, schoeisel en duidelijke accessoires " +
+          "afzonderlijk identificeert voor een digitale kledingkast. Antwoord " +
+          "uitsluitend met geldige JSON in het Nederlands.",
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text:
+              "Op deze foto draagt iemand een outfit. Identificeer elk individueel " +
+              "kledingstuk, schoeisel en duidelijk accessoire dat te zien is. " +
+              "Negeer huid, haar, achtergrond, sieraden en hele kleine details. " +
+              "Geef JSON terug met het veld 'items' (array). Elk item heeft: " +
+              "name (korte Nederlandse naam), mainCategory (een van: " +
+              MAIN_CATEGORIES.join(", ") +
+              "), subCategory (een van: " +
+              SUB_CATEGORIES.join(", ") +
+              " of null), colors (array), pattern (een van: " +
+              PATTERNS.join(", ") +
+              "), seasons (array uit: " +
+              SEASONS.join(", ") +
+              "), formality (een van: " +
+              FORMALITY_LEVELS.join(", ") +
+              "), styleTags (array uit: " +
+              STYLE_TAGS.join(", ") +
+              "), occasions (array), description (één korte zin), en " +
+              "boundingBox: een object met x, y, width, height als " +
+              "decimalen tussen 0 en 1 die de positie van het kledingstuk op " +
+              "de foto aangeven (x/y is de linker-bovenhoek, gemeten vanuit " +
+              "de linkerbovenhoek van de foto). Wees iets ruimer dan strak " +
+              "om het kledingstuk heen, zodat het niet wordt afgesneden. " +
+              "Sla items over waarvan je de positie niet kunt inschatten.",
+          },
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+          },
+        ],
+      },
+    ],
+  });
+
+  const content = completion.choices[0]?.message?.content ?? "{}";
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = JSON.parse(content) as Record<string, unknown>;
+  } catch {
+    parsed = {};
+  }
+
+  const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
+  const items: OutfitItemSuggestion[] = rawItems
+    .filter((entry): entry is Record<string, unknown> =>
+      Boolean(entry) && typeof entry === "object",
+    )
+    .map((entry) => ({
+      name: asString(entry.name) ?? "Kledingstuk",
+      mainCategory: asString(entry.mainCategory) ?? "bovenkleding",
+      subCategory: asString(entry.subCategory),
+      colors: asStringArray(entry.colors),
+      pattern: asString(entry.pattern),
+      seasons: asStringArray(entry.seasons),
+      formality: asString(entry.formality),
+      styleTags: asStringArray(entry.styleTags),
+      occasions: asStringArray(entry.occasions),
+      description: asString(entry.description),
+      boundingBox: parseBoundingBox(entry.boundingBox),
+    }));
+
+  const usage: AiUsage = {
+    model,
+    inputTokens: completion.usage?.prompt_tokens,
+    outputTokens: completion.usage?.completion_tokens,
+    totalTokens: completion.usage?.total_tokens,
+    costUsd: textCost(
+      model,
+      completion.usage?.prompt_tokens,
+      completion.usage?.completion_tokens,
+    ),
+  };
+
+  return { items, raw: parsed, usage };
 }
 
 export interface AdviceClothingItem {
