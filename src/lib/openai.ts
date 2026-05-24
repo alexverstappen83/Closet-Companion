@@ -263,6 +263,67 @@ export interface VisualizationItem extends VisualizationImage {
   description: string;
 }
 
+/** Vraagt het vision-model om een korte, neutrale beschrijving van pose,
+ *  framing en belichting van een referentiefoto. Wordt eenmalig per foto
+ *  uitgevoerd zodat de pose-anker in elke visualisatie hergebruikt kan worden. */
+export async function describeReferencePose(
+  imageBase64: string,
+  mimeType: string,
+): Promise<{ description: string; usage: AiUsage }> {
+  const openai = client();
+  const model = config.openai.visionModel;
+
+  const completion = await openai.chat.completions.create({
+    model,
+    max_tokens: 200,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Je analyseert een referentiefoto van een persoon voor een digitale " +
+          "kledingkast-app. Beschrijf alleen de pose, het kader en de belichting — " +
+          "niet de kleding, niet het gezicht, niet de identiteit van de persoon. " +
+          "Antwoord in het Nederlands, maximaal 3 korte zinnen, neutrale beschrijving.",
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text:
+              "Beschrijf voor deze foto in maximaal 3 zinnen: " +
+              "(1) lichaamshouding en stand van armen en handen, " +
+              "(2) framing (hoever ingezoomd, welk deel van het lichaam in beeld, camerahoek), " +
+              "(3) belichting en achtergrond op hoofdlijnen. " +
+              "Beschrijf geen kleding, gezichtskenmerken of identiteit.",
+          },
+          {
+            type: "image_url",
+            image_url: { url: `data:${mimeType};base64,${imageBase64}` },
+          },
+        ],
+      },
+    ],
+  });
+
+  const description =
+    completion.choices[0]?.message?.content?.trim() ?? "";
+
+  const usage: AiUsage = {
+    model,
+    inputTokens: completion.usage?.prompt_tokens,
+    outputTokens: completion.usage?.completion_tokens,
+    totalTokens: completion.usage?.total_tokens,
+    costUsd: textCost(
+      model,
+      completion.usage?.prompt_tokens,
+      completion.usage?.completion_tokens,
+    ),
+  };
+
+  return { description, usage };
+}
+
 /** Genereert een outfitvisualisatie op basis van referentiefoto's én de
  *  daadwerkelijke foto's van de kledingstukken. Door de kledingfoto's mee te
  *  sturen reproduceert het model logo's, prints en kleuren veel trouwer. */
@@ -270,6 +331,14 @@ export async function generateOutfitVisualization(params: {
   referenceImages: VisualizationImage[];
   clothingItems: VisualizationItem[];
   context?: string;
+  /** Vrije tekstbeschrijving van de persoon, samengesteld uit de profielvelden. */
+  personDescription?: string | null;
+  /** Door GPT-4o Vision uit de primaire referentiefoto gehaalde pose-beschrijving. */
+  poseDescription?: string | null;
+  /** Beschrijving van de gewenste achtergrond. Bij undefined of lege string
+   *  wordt de instructie weggelaten en kiest de AI op basis van de
+   *  persoon-foto's. */
+  backgroundPrompt?: string | null;
 }): Promise<{ image: Buffer; usage: AiUsage }> {
   const openai = client();
   const model = config.openai.imageModel;
@@ -299,15 +368,32 @@ export async function generateOutfitVisualization(params: {
       ? `foto ${itemsStart}`
       : `foto ${itemsStart} t/m ${itemsEnd}`;
 
+  const personLine = params.personDescription?.trim()
+    ? `De persoon op de foto's is een ${params.personDescription.trim()}. ` +
+      "Houd leeftijd, postuur en lichaamsbouw consistent met deze beschrijving."
+    : "";
+  const poseLine = params.poseDescription?.trim()
+    ? `Pose en framing zoals op de primaire persoon-foto: ${params.poseDescription.trim()} ` +
+      "Volg deze pose, framing en camerahoek zo nauwkeurig mogelijk."
+    : "";
+  const backgroundLine = params.backgroundPrompt?.trim()
+    ? `Achtergrond: ${params.backgroundPrompt.trim()}`
+    : "";
+
   const prompt = [
     `Je krijgt ${referenceCount + itemsCount} foto's mee, in deze volgorde:`,
     `- ${refRange}: foto's van de persoon.`,
     `- ${itemsRange}: foto's van kledingstukken (één foto per kledingstuk).`,
     "",
+    personLine,
+    poseLine,
+    "",
     `Gebruik de persoon-foto's (${refRange}) alleen voor:`,
     "- het uiterlijk en de lichaamsverhoudingen van de persoon",
     "- de pose en lichaamshouding",
-    "- de achtergrond, het kader en de belichting",
+    backgroundLine
+      ? "- het kader (de achtergrond wordt apart hieronder beschreven)"
+      : "- de achtergrond, het kader en de belichting",
     "Negeer de kleding op deze foto's volledig.",
     "",
     `Gebruik de kledingfoto's (${itemsRange}) als bron voor hoe elk kledingstuk eruitziet:`,
@@ -325,6 +411,7 @@ export async function generateOutfitVisualization(params: {
     params.context
       ? `Gelegenheid waar deze outfit voor bedoeld is: ${params.context}.`
       : "",
+    backgroundLine,
     "",
     "Resultaat: één natuurlijke fotorealistische afbeelding van dezelfde persoon",
     "in deze outfit, met realistische pasvorm en natuurlijke belichting.",

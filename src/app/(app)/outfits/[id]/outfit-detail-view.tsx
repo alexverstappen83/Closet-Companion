@@ -26,6 +26,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { BACKGROUND_PRESETS } from "@/lib/constants";
 import { deleteOutfit, toggleOutfitFavorite } from "@/lib/actions/outfits";
 import { imageUrl } from "@/lib/image-url";
 import { cn } from "@/lib/utils";
@@ -68,6 +71,7 @@ export function OutfitDetailView({
   const [previews, setPreviews] = useState<GeneratedImage[]>(generated);
   const [visualizing, setVisualizing] = useState(false);
   const [visualizeError, setVisualizeError] = useState<string | null>(null);
+  const [background, setBackground] = useState<string>("auto");
 
   function handleFavorite() {
     startFav(async () => {
@@ -96,7 +100,7 @@ export function OutfitDetailView({
       const response = await fetch("/api/visualize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ outfitId: id }),
+        body: JSON.stringify({ outfitId: id, background }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -215,6 +219,22 @@ export function OutfitDetailView({
                 Stel eerst een primaire referentiefoto in.
               </p>
             ) : null}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="background">Achtergrond</Label>
+              <Select
+                id="background"
+                value={background}
+                onChange={(event) => setBackground(event.target.value)}
+                disabled={visualizing}
+              >
+                {BACKGROUND_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
             {visualizeError && (
               <p className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">

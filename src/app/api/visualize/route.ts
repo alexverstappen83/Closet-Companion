@@ -10,8 +10,14 @@ import {
   generateOutfitVisualization,
   OpenAiNotConfiguredError,
 } from "@/lib/openai";
+import {
+  BACKGROUND_PRESETS,
+  inferBackgroundFromOccasion,
+  type BackgroundPresetId,
+} from "@/lib/constants";
 import { imageUrl } from "@/lib/image-url";
 import { normalizeForOpenAi } from "@/lib/image-prep";
+import { describePersonProfile } from "@/lib/person-profile";
 import { prisma } from "@/lib/prisma";
 import { readImage, saveBuffer } from "@/lib/storage";
 
@@ -19,11 +25,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
+const validBackgroundIds = BACKGROUND_PRESETS.map((preset) => preset.id);
+
 const bodySchema = z.object({
   outfitId: z.string().trim().min(1),
+  background: z
+    .enum(validBackgroundIds as [string, ...string[]])
+    .optional(),
 });
 
-const PROMPT_VERSION = "v3";
+const PROMPT_VERSION = "v4";
 const MAX_REFERENCE_PHOTOS = 4;
 
 function describeItem(item: {
@@ -92,6 +103,30 @@ export async function POST(request: NextRequest) {
   }
   const primary = refPhotos.find((entry) => entry.isPrimary) ?? refPhotos[0];
 
+  const userProfile = await prisma.user.findUnique({
+    where: { id: user.id },
+    select: {
+      ageYears: true,
+      heightCm: true,
+      bodyBuild: true,
+      hairColor: true,
+      hairLength: true,
+      skinTone: true,
+      genderPresentation: true,
+      wearsGlasses: true,
+      facialHair: true,
+      appearanceNotes: true,
+    },
+  });
+
+  const requestedBackgroundId =
+    (parsed.data.background as BackgroundPresetId | undefined) ?? "auto";
+  const backgroundPreset =
+    requestedBackgroundId === "auto"
+      ? inferBackgroundFromOccasion(outfit.occasion)
+      : BACKGROUND_PRESETS.find((entry) => entry.id === requestedBackgroundId) ??
+        inferBackgroundFromOccasion(outfit.occasion);
+
   try {
     await assertWithinBudget(user.id, ESTIMATED_COST.visualization);
   } catch (error) {
@@ -137,6 +172,9 @@ export async function POST(request: NextRequest) {
       referenceImages,
       clothingItems,
       context: outfit.occasion ?? outfit.name,
+      personDescription: describePersonProfile(userProfile),
+      poseDescription: primary.poseDescription,
+      backgroundPrompt: backgroundPreset.prompt || null,
     });
 
     const storedPath = await saveBuffer("outfit-previews", user.id, image, "png");

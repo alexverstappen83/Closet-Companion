@@ -15,7 +15,12 @@ export default async function ReferencePhotosPage() {
   const photos = await prisma.referencePhoto.findMany({
     where: { userId: user.id },
     orderBy: [{ isPrimary: "desc" }, { createdAt: "desc" }],
-    select: { id: true, imagePath: true, isPrimary: true },
+    select: {
+      id: true,
+      imagePath: true,
+      isPrimary: true,
+      poseDescription: true,
+    },
   });
 
   return (

@@ -34,6 +34,20 @@ model User {
   role         UserRole @default(USER)
   isActive     Boolean  @default(true)
 
+  // Persoonsprofiel voor AI-visualisaties. Optionele velden — als ze ingevuld
+  // zijn worden ze als tekstanker meegegeven aan gpt-image-1, zodat de
+  // identiteit van de persoon tussen generaties consistenter blijft.
+  ageYears           Int?
+  heightCm           Int?
+  bodyBuild          String?
+  hairColor          String?
+  hairLength         String?
+  skinTone           String?
+  genderPresentation String?
+  wearsGlasses       Boolean?
+  facialHair         String?
+  appearanceNotes    String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -86,6 +100,11 @@ model ReferencePhoto {
 
   isPrimary Boolean @default(false)
   notes     String?
+
+  // Door GPT-4o Vision gegenereerde korte beschrijving van pose, framing en
+  // belichting op deze foto. Wordt eenmalig bij upload geanalyseerd en bij
+  // elke AI-preview hergebruikt om de pose stabiel over te dragen.
+  poseDescription String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

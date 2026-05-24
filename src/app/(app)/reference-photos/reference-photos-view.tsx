@@ -6,6 +6,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  Sparkles,
   Star,
   Trash2,
   Upload,
@@ -16,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  analyzeReferencePhotoPose,
   deleteReferencePhoto,
   setPrimaryReferencePhoto,
   uploadReferencePhoto,
@@ -26,6 +28,7 @@ interface ReferencePhoto {
   id: string;
   imagePath: string;
   isPrimary: boolean;
+  poseDescription: string | null;
 }
 
 export function ReferencePhotosView({
@@ -81,6 +84,13 @@ export function ReferencePhotosView({
   async function remove(id: string) {
     setBusyId(id);
     await deleteReferencePhoto(id);
+    setBusyId(null);
+    router.refresh();
+  }
+
+  async function reanalyzePose(id: string) {
+    setBusyId(id);
+    await analyzeReferencePhotoPose(id);
     setBusyId(null);
     router.refresh();
   }
@@ -197,6 +207,19 @@ export function ReferencePhotosView({
                   )}
                 </div>
                 <div className="space-y-1.5 p-2.5">
+                  {photo.poseDescription ? (
+                    <p
+                      className="line-clamp-3 text-xs text-muted-foreground"
+                      title={photo.poseDescription}
+                    >
+                      <Sparkles className="mr-1 inline h-3 w-3 text-primary" />
+                      {photo.poseDescription}
+                    </p>
+                  ) : (
+                    <p className="text-xs italic text-muted-foreground">
+                      Pose nog niet geanalyseerd.
+                    </p>
+                  )}
                   {!photo.isPrimary && (
                     <Button
                       type="button"
@@ -214,6 +237,21 @@ export function ReferencePhotosView({
                       Maak primair
                     </Button>
                   )}
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => reanalyzePose(photo.id)}
+                    disabled={busyId === photo.id}
+                  >
+                    {busyId === photo.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4" />
+                    )}
+                    Pose (her)analyseren
+                  </Button>
                   <Button
                     type="button"
                     variant="ghost"
