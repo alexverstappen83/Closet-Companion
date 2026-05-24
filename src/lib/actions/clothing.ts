@@ -7,10 +7,11 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import { apiUser } from "@/lib/guards";
 import { prisma } from "@/lib/prisma";
-import { deleteImage, ownerOfImagePath } from "@/lib/storage";
+import { deleteImage, ownerOfImagePath, saveUpload, UploadError } from "@/lib/storage";
 
 const metadataSchema = z.object({
   name: z.string().trim().min(1, "Geef het kledingstuk een naam.").max(120),
+  brand: z.string().trim().max(120).optional().nullable(),
   mainCategory: z.string().trim().min(1, "Kies een hoofdcategorie."),
   subCategory: z.string().trim().max(80).optional().nullable(),
   colors: z.array(z.string().trim().min(1)).max(20).default([]),
@@ -59,6 +60,7 @@ export async function createClothingItem(
     data: {
       userId: user.id,
       name: data.name,
+      brand: clean(data.brand),
       mainCategory: data.mainCategory,
       subCategory: clean(data.subCategory),
       colors: data.colors,
@@ -106,6 +108,7 @@ export async function updateClothingItem(
     where: { id },
     data: {
       name: data.name,
+      brand: clean(data.brand),
       mainCategory: data.mainCategory,
       subCategory: clean(data.subCategory),
       colors: data.colors,
@@ -117,6 +120,54 @@ export async function updateClothingItem(
       notes: clean(data.notes),
     },
   });
+
+  revalidatePath("/closet");
+  revalidatePath(`/closet/${id}`);
+  return { ok: true, id };
+}
+
+/** Vervangt de foto van een bestaand kledingstuk door een nieuwe upload. De
+ *  oude foto wordt na succes definitief verwijderd. */
+export async function replaceClothingImage(
+  id: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const user = await apiUser();
+  if (!user) return { ok: false, error: "Je bent niet ingelogd." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { ok: false, error: "Geen bestand ontvangen." };
+  }
+
+  const existing = await prisma.clothingItem.findUnique({ where: { id } });
+  if (!existing || existing.userId !== user.id) {
+    return { ok: false, error: "Kledingstuk niet gevonden." };
+  }
+
+  let saved;
+  try {
+    saved = await saveUpload("clothing", user.id, file);
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof UploadError ? error.message : "Upload mislukt.",
+    };
+  }
+
+  const oldImagePath = existing.imagePath;
+  await prisma.clothingItem.update({
+    where: { id },
+    data: {
+      imagePath: saved.imagePath,
+      mimeType: saved.mimeType,
+      originalName: saved.originalName,
+    },
+  });
+
+  // Pas verwijderen nadat de database is bijgewerkt, anders raakt een crash
+  // tussen de twee operaties zowel de oude als de nieuwe foto kwijt.
+  await deleteImage(oldImagePath);
 
   revalidatePath("/closet");
   revalidatePath(`/closet/${id}`);

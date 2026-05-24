@@ -28,6 +28,7 @@ import { MAIN_CATEGORIES } from "@/lib/constants";
 
 interface Suggestion {
   name: string;
+  brand: string | null;
   mainCategory: string;
   subCategory: string | null;
   colors: string[];
@@ -53,6 +54,7 @@ function toMetadata(suggestion?: Suggestion): ClothingMetadata {
   if (!suggestion) return emptyMetadata;
   return {
     name: suggestion.name ?? "",
+    brand: suggestion.brand ?? "",
     mainCategory: MAIN_CATEGORIES.includes(suggestion.mainCategory as never)
       ? suggestion.mainCategory
       : "bovenkleding",

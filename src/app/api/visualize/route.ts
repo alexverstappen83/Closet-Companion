@@ -39,6 +39,7 @@ const MAX_REFERENCE_PHOTOS = 4;
 
 function describeItem(item: {
   name: string;
+  brand: string | null;
   mainCategory: string;
   subCategory: string | null;
   colors: string[];
@@ -47,6 +48,7 @@ function describeItem(item: {
   notes: string | null;
 }): string {
   const parts = [item.name];
+  if (item.brand) parts.push(`merk: ${item.brand}`);
   parts.push(`type: ${item.subCategory ?? item.mainCategory}`);
   if (item.colors.length) parts.push(`kleur: ${item.colors.join(", ")}`);
   parts.push(`patroon: ${item.pattern ?? "egaal, geen prints of logo's"}`);

@@ -22,6 +22,7 @@ import {
 
 export interface ClothingMetadata {
   name: string;
+  brand: string;
   mainCategory: string;
   subCategory: string;
   colors: string[];
@@ -35,6 +36,7 @@ export interface ClothingMetadata {
 
 export const emptyMetadata: ClothingMetadata = {
   name: "",
+  brand: "",
   mainCategory: "bovenkleding",
   subCategory: "",
   colors: [],
@@ -87,15 +89,26 @@ export function ClothingMetadataForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <div className="space-y-2">
-        <Label htmlFor="name">Naam</Label>
-        <Input
-          id="name"
-          value={values.name}
-          onChange={(event) => update("name", event.target.value)}
-          placeholder="Bijv. Lichtblauw linnen overhemd"
-          required
-        />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="name">Naam</Label>
+          <Input
+            id="name"
+            value={values.name}
+            onChange={(event) => update("name", event.target.value)}
+            placeholder="Bijv. Lichtblauw linnen overhemd"
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="brand">Merk</Label>
+          <Input
+            id="brand"
+            value={values.brand}
+            onChange={(event) => update("brand", event.target.value)}
+            placeholder="Bijv. Uniqlo, COS, Nike"
+          />
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

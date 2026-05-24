@@ -49,6 +49,7 @@ export interface AiUsage {
 
 export interface ClothingSuggestion {
   name: string;
+  brand: string | null;
   mainCategory: string;
   subCategory: string | null;
   colors: string[];
@@ -130,7 +131,8 @@ export async function recognizeClothing(
             type: "text",
             text:
               "Analyseer dit kledingstuk en geef JSON terug met exact deze velden: " +
-              "name (korte Nederlandse naam), mainCategory (een van: " +
+              "name (korte Nederlandse naam), brand (merknaam als zichtbaar op " +
+              "het kledingstuk of een logo, anders null), mainCategory (een van: " +
               MAIN_CATEGORIES.join(", ") +
               "), subCategory (een van: " +
               SUB_CATEGORIES.join(", ") +
@@ -163,6 +165,7 @@ export async function recognizeClothing(
 
   const suggestion: ClothingSuggestion = {
     name: asString(parsed.name) ?? "Nieuw kledingstuk",
+    brand: asString(parsed.brand),
     mainCategory: asString(parsed.mainCategory) ?? "bovenkleding",
     subCategory: asString(parsed.subCategory),
     colors: asStringArray(parsed.colors),
@@ -249,7 +252,8 @@ export async function recognizeOutfitPhoto(
               "kledingstuk, schoeisel en duidelijk accessoire dat te zien is. " +
               "Negeer huid, haar, achtergrond, sieraden en hele kleine details. " +
               "Geef JSON terug met het veld 'items' (array). Elk item heeft: " +
-              "name (korte Nederlandse naam), mainCategory (een van: " +
+              "name (korte Nederlandse naam), brand (merknaam als zichtbaar op " +
+              "het kledingstuk of een logo, anders null), mainCategory (een van: " +
               MAIN_CATEGORIES.join(", ") +
               "), subCategory (een van: " +
               SUB_CATEGORIES.join(", ") +
@@ -293,6 +297,7 @@ export async function recognizeOutfitPhoto(
     )
     .map((entry) => ({
       name: asString(entry.name) ?? "Kledingstuk",
+      brand: asString(entry.brand),
       mainCategory: asString(entry.mainCategory) ?? "bovenkleding",
       subCategory: asString(entry.subCategory),
       colors: asStringArray(entry.colors),

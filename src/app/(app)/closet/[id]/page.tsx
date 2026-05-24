@@ -27,6 +27,7 @@ export default async function ClothingDetailPage({
 
   const initial: ClothingMetadata = {
     name: item.name,
+    brand: item.brand ?? "",
     mainCategory: item.mainCategory,
     subCategory: item.subCategory ?? "",
     colors: item.colors,
@@ -44,7 +45,14 @@ export default async function ClothingDetailPage({
         title={item.name}
         description={`Toegevoegd op ${formatDate(item.createdAt)}`}
       />
-      <EditClothingView id={item.id} imagePath={item.imagePath} initial={initial} />
+      <EditClothingView
+        id={item.id}
+        imagePath={item.imagePath}
+        initial={initial}
+        brand={item.brand}
+        name={item.name}
+        colors={item.colors}
+      />
     </div>
   );
 }

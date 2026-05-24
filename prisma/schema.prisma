@@ -69,6 +69,7 @@ model ClothingItem {
   userId String
 
   name         String
+  brand        String?
   mainCategory String
   subCategory  String?
   colors       String[]
