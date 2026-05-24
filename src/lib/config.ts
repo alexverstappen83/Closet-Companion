@@ -23,6 +23,11 @@ export const config = {
     visionModel: process.env.OPENAI_DEFAULT_VISION_MODEL || "gpt-4o-mini",
     imageModel: process.env.OPENAI_DEFAULT_IMAGE_MODEL || "gpt-image-1",
   },
+
+  googleSearch: {
+    apiKey: process.env.GOOGLE_CSE_API_KEY ?? "",
+    engineId: process.env.GOOGLE_CSE_ID ?? "",
+  },
 };
 
 export const ALLOWED_IMAGE_TYPES = [
@@ -34,4 +39,10 @@ export const ALLOWED_IMAGE_TYPES = [
 
 export function isOpenAiConfigured(): boolean {
   return config.openai.apiKey.length > 0 && config.openai.apiKey !== "change-me";
+}
+
+export function isGoogleSearchConfigured(): boolean {
+  return (
+    config.googleSearch.apiKey.length > 0 && config.googleSearch.engineId.length > 0
+  );
 }

@@ -336,6 +336,70 @@ export interface AdviceClothingItem {
   styleTags: string[];
 }
 
+/** Genereert een schone studio-productfoto van een kledingstuk op basis van
+ *  de beschikbare metadata. Wordt gebruikt om in de kledingkast een nettere
+ *  catalogus-stijl foto te krijgen wanneer de oorspronkelijke foto rommelig
+ *  is of het kledingstuk gedragen werd op de foto. */
+export async function generateProductPhoto(item: {
+  name: string;
+  brand?: string | null;
+  mainCategory: string;
+  subCategory?: string | null;
+  colors: string[];
+  pattern?: string | null;
+  notes?: string | null;
+}): Promise<{ image: Buffer; usage: AiUsage }> {
+  const openai = client();
+  const model = config.openai.imageModel;
+
+  const descriptors: string[] = [item.name];
+  if (item.brand) descriptors.push(`merk: ${item.brand}`);
+  descriptors.push(`type: ${item.subCategory ?? item.mainCategory}`);
+  if (item.colors.length) {
+    descriptors.push(`kleur: ${item.colors.join(", ")}`);
+  }
+  if (item.pattern) descriptors.push(`patroon: ${item.pattern}`);
+  if (item.notes) descriptors.push(`extra: ${item.notes}`);
+
+  const prompt = [
+    "Maak een schone, fotorealistische productfoto van het volgende kledingstuk:",
+    descriptors.join("; ") + ".",
+    "",
+    "Stijl: catalogusfoto, het kledingstuk volledig in beeld, op een schone",
+    "lichtgrijze of witte studio-achtergrond, zachte gelijkmatige belichting,",
+    "geen model, geen mannequin, geen hangertje zichtbaar. Het kledingstuk",
+    "ligt netjes uitgespreid of staat plat met natuurlijke val. Realistische",
+    "stofstructuur en kleurweergave die past bij de beschrijving.",
+    "",
+    "Voeg geen tekst, watermerk of extra accessoires toe. Vermijd verzonnen",
+    "logo's of merken die niet expliciet zijn genoemd.",
+  ].join("\n");
+
+  const result = await openai.images.generate({
+    model,
+    prompt,
+    size: "1024x1024",
+  });
+
+  const b64 = result.data?.[0]?.b64_json;
+  if (!b64) {
+    throw new Error("OpenAI gaf geen afbeelding terug.");
+  }
+
+  const imageUsage = (
+    result as { usage?: { input_tokens?: number; output_tokens?: number } }
+  ).usage;
+  const usage: AiUsage = {
+    model,
+    imageCount: 1,
+    inputTokens: imageUsage?.input_tokens,
+    outputTokens: imageUsage?.output_tokens,
+    costUsd: IMAGE_COST_USD,
+  };
+
+  return { image: Buffer.from(b64, "base64"), usage };
+}
+
 /** Vraagt OpenAI om drie verschillende stijladviezen op basis van de
  *  kledingkast. Drie opties geven veel meer creatieve speelruimte dan één:
  *  de gebruiker kan kiezen welke aanpak het best bij de gelegenheid past. */
