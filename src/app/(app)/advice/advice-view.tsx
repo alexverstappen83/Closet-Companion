@@ -21,9 +21,17 @@ interface RecommendedItem {
   imagePath: string;
 }
 
-interface AdviceResponse {
-  advice: { outfitName: string; advice: string; recommendedItemIds: string[] };
+interface AdviceOption {
+  advice: {
+    outfitName: string;
+    advice: string;
+    recommendedItemIds: string[];
+  };
   recommendedItems: RecommendedItem[];
+}
+
+interface AdviceResponse {
+  options: AdviceOption[];
 }
 
 export function AdviceView() {
@@ -32,8 +40,9 @@ export function AdviceView() {
   const [preferences, setPreferences] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<AdviceResponse | null>(null);
+  const [options, setOptions] = useState<AdviceOption[] | null>(null);
   const [saving, startSave] = useTransition();
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   async function requestAdvice(event: React.FormEvent) {
@@ -44,7 +53,7 @@ export function AdviceView() {
     }
     setLoading(true);
     setError(null);
-    setResult(null);
+    setOptions(null);
     setSaveError(null);
     try {
       const response = await fetch("/api/advice", {
@@ -57,7 +66,8 @@ export function AdviceView() {
         setError(data.error ?? "Het ophalen van advies is mislukt.");
         return;
       }
-      setResult(data as AdviceResponse);
+      const parsed = data as AdviceResponse;
+      setOptions(parsed.options ?? []);
     } catch {
       setError("Er ging iets mis. Probeer het later opnieuw.");
     } finally {
@@ -65,17 +75,18 @@ export function AdviceView() {
     }
   }
 
-  function saveAsOutfit() {
-    if (!result) return;
+  function saveAsOutfit(option: AdviceOption, index: number) {
     setSaveError(null);
+    setSavingIndex(index);
     startSave(async () => {
       const created = await createOutfit({
-        name: result.advice.outfitName,
+        name: option.advice.outfitName,
         occasion: occasion || null,
-        description: result.advice.advice,
+        description: option.advice.advice,
         styleTags: [],
-        itemIds: result.recommendedItems.map((item) => item.id),
+        itemIds: option.recommendedItems.map((item) => item.id),
       });
+      setSavingIndex(null);
       if (created.ok && created.id) {
         router.push(`/outfits/${created.id}`);
         router.refresh();
@@ -86,13 +97,16 @@ export function AdviceView() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Waar gaat het naartoe?</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={requestAdvice} className="space-y-4">
+          <form
+            onSubmit={requestAdvice}
+            className="grid gap-4 md:grid-cols-2 md:items-start"
+          >
             <div className="space-y-2">
               <Label htmlFor="occasion">Gelegenheid</Label>
               <Input
@@ -119,97 +133,134 @@ export function AdviceView() {
               />
             </div>
 
-            <AiNotice>
-              De gegevens van je kledingkast worden naar OpenAI gestuurd om
-              advies te maken. Dit verbruikt een klein deel van je AI-tegoed.
-            </AiNotice>
+            <div className="md:col-span-2 space-y-3">
+              <AiNotice>
+                De gegevens van je kledingkast worden naar OpenAI gestuurd om
+                drie verschillende outfit-opties te maken. Dit verbruikt een
+                klein deel van je AI-tegoed.
+              </AiNotice>
 
-            {error && (
-              <p className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                {error}
-              </p>
-            )}
-
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
+              {error && (
+                <p className="flex items-start gap-2 rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  {error}
+                </p>
               )}
-              Vraag stijladvies
-            </Button>
+
+              <Button type="submit" disabled={loading}>
+                {loading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+                Vraag drie outfit-adviezen
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Advies</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!result ? (
-            <p className="text-sm text-muted-foreground">
-              Vul een gelegenheid in en ontvang een outfitadvies op basis van je
-              eigen kledingkast.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold">
-                  {result.advice.outfitName}
-                </h3>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  {result.advice.advice}
-                </p>
-              </div>
+      {!options && !loading && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            Vul een gelegenheid in en ontvang drie verschillende outfitadviezen
+            op basis van je eigen kledingkast.
+          </CardContent>
+        </Card>
+      )}
 
-              {result.recommendedItems.length > 0 && (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {result.recommendedItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="overflow-hidden rounded-lg border bg-card"
-                    >
-                      <div className="aspect-square bg-secondary">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={imageUrl(item.imagePath)}
-                          alt={item.name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <p className="truncate px-2 py-1.5 text-xs font-medium">
-                        {item.name}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
+      {loading && (
+        <Card>
+          <CardContent className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            De stylist denkt na…
+          </CardContent>
+        </Card>
+      )}
 
-              {saveError && (
-                <p className="text-sm text-destructive">{saveError}</p>
-              )}
-
-              {result.recommendedItems.length > 0 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={saveAsOutfit}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Bookmark className="h-4 w-4" />
-                  )}
-                  Bewaar als outfit
-                </Button>
-              )}
-            </div>
+      {options && options.length > 0 && (
+        <>
+          {saveError && (
+            <p className="text-sm text-destructive">{saveError}</p>
           )}
-        </CardContent>
-      </Card>
+          <div className="grid gap-4 lg:grid-cols-3">
+            {options.map((option, index) => (
+              <Card key={index} className="flex flex-col">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                      {index + 1}
+                    </span>
+                    <CardTitle className="text-base leading-tight">
+                      {option.advice.outfitName}
+                    </CardTitle>
+                  </div>
+                </CardHeader>
+                <CardContent className="flex flex-1 flex-col gap-4">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    {option.advice.advice}
+                  </p>
+
+                  {option.recommendedItems.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {option.recommendedItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="overflow-hidden rounded-lg border bg-card"
+                        >
+                          <div className="aspect-square bg-secondary">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={imageUrl(item.imagePath)}
+                              alt={item.name}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                          <p className="truncate px-2 py-1.5 text-xs font-medium">
+                            {item.name}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs italic text-muted-foreground">
+                      Geen passende kledingstukken gevonden voor deze optie.
+                    </p>
+                  )}
+
+                  <div className="mt-auto">
+                    {option.recommendedItems.length > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => saveAsOutfit(option, index)}
+                        disabled={saving}
+                      >
+                        {saving && savingIndex === index ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Bookmark className="h-4 w-4" />
+                        )}
+                        Bewaar als outfit
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      {options && options.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center text-sm text-muted-foreground">
+            De AI gaf geen bruikbare opties terug. Probeer het opnieuw, eventueel
+            met een andere omschrijving van de gelegenheid.
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

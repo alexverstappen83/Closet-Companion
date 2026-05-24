@@ -336,19 +336,23 @@ export interface AdviceClothingItem {
   styleTags: string[];
 }
 
-/** Vraagt OpenAI om persoonlijk stijladvies op basis van de kledingkast. */
+/** Vraagt OpenAI om drie verschillende stijladviezen op basis van de
+ *  kledingkast. Drie opties geven veel meer creatieve speelruimte dan één:
+ *  de gebruiker kan kiezen welke aanpak het best bij de gelegenheid past. */
 export async function generateStyleAdvice(params: {
   occasion: string;
   items: AdviceClothingItem[];
   preferences?: string;
-}): Promise<{ advice: StyleAdvice; usage: AiUsage }> {
+  count?: number;
+}): Promise<{ advices: StyleAdvice[]; usage: AiUsage }> {
   const openai = client();
   const model = config.openai.textModel;
+  const count = Math.max(1, Math.min(5, params.count ?? 3));
 
   const completion = await openai.chat.completions.create({
     model,
     response_format: { type: "json_object" },
-    max_tokens: 600,
+    max_tokens: 1500,
     messages: [
       {
         role: "system",
@@ -364,9 +368,16 @@ export async function generateStyleAdvice(params: {
           `Gelegenheid: ${params.occasion}\n` +
           (params.preferences ? `Persoonlijke voorkeuren: ${params.preferences}\n` : "") +
           `Beschikbare kledingkast (JSON): ${JSON.stringify(params.items)}\n\n` +
-          "Stel een passende outfit samen met uitsluitend kledingstukken uit deze lijst. " +
-          "Geef JSON terug met de velden: outfitName (korte naam), advice (een wervende " +
-          "uitleg van 2-4 zinnen), recommendedItemIds (array met id's uit de lijst).",
+          `Stel ${count} duidelijk verschillende outfits samen met uitsluitend ` +
+          "kledingstukken uit deze lijst. Elke outfit moet een andere benadering " +
+          "hebben (bijvoorbeeld: één klassieker/formeler, één relaxter/casual, " +
+          "één met een gedurfdere accentkeuze) zodat de gebruiker echt iets te " +
+          "kiezen heeft.\n" +
+          "Geef JSON terug met het veld 'options' (array met exact " +
+          `${count} elementen). Elk element heeft: outfitName (korte unieke naam), ` +
+          "advice (wervende uitleg van 2-4 zinnen waarin je vertelt waarom " +
+          "deze keuze past en welk gevoel hij oproept), recommendedItemIds " +
+          "(array met id's uit de lijst).",
       },
     ],
   });
@@ -380,13 +391,31 @@ export async function generateStyleAdvice(params: {
   }
 
   const validIds = new Set(params.items.map((item) => item.id));
-  const advice: StyleAdvice = {
-    outfitName: asString(parsed.outfitName) ?? `Outfit voor ${params.occasion}`,
-    advice: asString(parsed.advice) ?? "Geen advies ontvangen.",
-    recommendedItemIds: asStringArray(parsed.recommendedItemIds).filter((id) =>
-      validIds.has(id),
-    ),
-  };
+  const rawOptions = Array.isArray(parsed.options) ? parsed.options : [];
+  const advices: StyleAdvice[] = rawOptions
+    .filter((entry): entry is Record<string, unknown> =>
+      Boolean(entry) && typeof entry === "object",
+    )
+    .map((entry, index) => ({
+      outfitName:
+        asString(entry.outfitName) ??
+        `Outfit voor ${params.occasion} (${index + 1})`,
+      advice: asString(entry.advice) ?? "Geen advies ontvangen.",
+      recommendedItemIds: asStringArray(entry.recommendedItemIds).filter((id) =>
+        validIds.has(id),
+      ),
+    }))
+    .filter((advice) => advice.recommendedItemIds.length > 0);
+
+  // Val terug op één lege placeholder als het model niets bruikbaars terug
+  // gaf, zodat de UI nooit een leeg array hoeft af te handelen.
+  if (advices.length === 0) {
+    advices.push({
+      outfitName: `Outfit voor ${params.occasion}`,
+      advice: "Geen advies ontvangen.",
+      recommendedItemIds: [],
+    });
+  }
 
   const usage: AiUsage = {
     model,
@@ -400,7 +429,7 @@ export async function generateStyleAdvice(params: {
     ),
   };
 
-  return { advice, usage };
+  return { advices, usage };
 }
 
 export interface VisualizationImage {

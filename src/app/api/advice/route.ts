@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { advice, usage } = await generateStyleAdvice({
+    const { advices, usage } = await generateStyleAdvice({
       occasion: parsed.data.occasion,
       preferences: parsed.data.preferences,
       items: items.map((item) => ({
@@ -99,16 +99,21 @@ export async function POST(request: NextRequest) {
       totalTokens: usage.totalTokens,
     });
 
-    const recommendedItems = items
-      .filter((item) => advice.recommendedItemIds.includes(item.id))
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        mainCategory: item.mainCategory,
-        imagePath: item.imagePath,
-      }));
+    const itemById = new Map(items.map((item) => [item.id, item]));
+    const options = advices.map((advice) => ({
+      advice,
+      recommendedItems: advice.recommendedItemIds
+        .map((id) => itemById.get(id))
+        .filter((item): item is (typeof items)[number] => Boolean(item))
+        .map((item) => ({
+          id: item.id,
+          name: item.name,
+          mainCategory: item.mainCategory,
+          imagePath: item.imagePath,
+        })),
+    }));
 
-    return Response.json({ advice, recommendedItems });
+    return Response.json({ options });
   } catch (error) {
     await logAiUsage({
       userId: user.id,
