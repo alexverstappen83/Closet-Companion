@@ -12,8 +12,9 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   BODY_BUILDS,
-  GENDER_PRESENTATIONS,
+  EYE_COLORS,
   HAIR_LENGTHS,
+  HAIR_TEXTURES,
   SKIN_TONES,
 } from "@/lib/constants";
 import {
@@ -51,9 +52,13 @@ export interface PersonProfileInitial {
   ageYears: number | null;
   heightCm: number | null;
   bodyBuild: string | null;
+  clothingSize: string | null;
   hairColor: string | null;
   hairLength: string | null;
+  hairTexture: string | null;
+  eyeColor: string | null;
   skinTone: string | null;
+  ethnicLook: string | null;
   genderPresentation: string | null;
   wearsGlasses: boolean | null;
   facialHair: string | null;
@@ -92,15 +97,24 @@ export function ProfileView({
   const [bodyBuild, setBodyBuild] = useState(
     initialPersonProfile.bodyBuild ?? "",
   );
+  const [clothingSize, setClothingSize] = useState(
+    initialPersonProfile.clothingSize ?? "",
+  );
   const [hairColor, setHairColor] = useState(
     initialPersonProfile.hairColor ?? "",
   );
   const [hairLength, setHairLength] = useState(
     initialPersonProfile.hairLength ?? "",
   );
+  const [hairTexture, setHairTexture] = useState(
+    initialPersonProfile.hairTexture ?? "",
+  );
+  const [eyeColor, setEyeColor] = useState(
+    initialPersonProfile.eyeColor ?? "",
+  );
   const [skinTone, setSkinTone] = useState(initialPersonProfile.skinTone ?? "");
-  const [genderPresentation, setGenderPresentation] = useState(
-    initialPersonProfile.genderPresentation ?? "",
+  const [ethnicLook, setEthnicLook] = useState(
+    initialPersonProfile.ethnicLook ?? "",
   );
   const [wearsGlasses, setWearsGlasses] = useState<"" | "ja" | "nee">(
     initialPersonProfile.wearsGlasses === true
@@ -168,10 +182,13 @@ export function ProfileView({
         ageYears: ageNumber,
         heightCm: heightNumber,
         bodyBuild: bodyBuild || null,
+        clothingSize: clothingSize || null,
         hairColor: hairColor || null,
         hairLength: hairLength || null,
+        hairTexture: hairTexture || null,
+        eyeColor: eyeColor || null,
         skinTone: skinTone || null,
-        genderPresentation: genderPresentation || null,
+        ethnicLook: ethnicLook || null,
         wearsGlasses:
           wearsGlasses === "ja" ? true : wearsGlasses === "nee" ? false : null,
         facialHair: facialHair || null,
@@ -267,9 +284,9 @@ export function ProfileView({
             Persoonsprofiel voor AI-visualisaties
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Optionele velden. Als je ze invult worden ze als tekstanker
-            meegegeven aan de AI, zodat leeftijd, lichaamsbouw en uiterlijk
-            tussen visualisaties veel consistenter blijven.
+            Optionele velden, alleen gebruikt voor de AI-visualisatie en
+            opgeslagen op je eigen server. De referentiefoto blijft altijd
+            leidend; deze tekst is alleen een hulp bij twijfel.
           </p>
         </CardHeader>
         <CardContent>
@@ -300,23 +317,6 @@ export function ProfileView({
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="genderPresentation">Genderpresentatie</Label>
-                <Select
-                  id="genderPresentation"
-                  value={genderPresentation}
-                  onChange={(event) =>
-                    setGenderPresentation(event.target.value)
-                  }
-                >
-                  <option value="">— niet gespecificeerd —</option>
-                  {GENDER_PRESENTATIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div className="space-y-2">
                 <Label htmlFor="bodyBuild">Lichaamsbouw</Label>
                 <Select
                   id="bodyBuild"
@@ -330,6 +330,15 @@ export function ProfileView({
                     </option>
                   ))}
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="clothingSize">Confectiemaat</Label>
+                <Input
+                  id="clothingSize"
+                  value={clothingSize}
+                  onChange={(event) => setClothingSize(event.target.value)}
+                  placeholder="bijv. M, 48, 36"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="hairLength">Haarlengte</Label>
@@ -347,6 +356,21 @@ export function ProfileView({
                 </Select>
               </div>
               <div className="space-y-2">
+                <Label htmlFor="hairTexture">Haartextuur</Label>
+                <Select
+                  id="hairTexture"
+                  value={hairTexture}
+                  onChange={(event) => setHairTexture(event.target.value)}
+                >
+                  <option value="">— niet gespecificeerd —</option>
+                  {HAIR_TEXTURES.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="hairColor">Haarkleur</Label>
                 <Input
                   id="hairColor"
@@ -354,6 +378,21 @@ export function ProfileView({
                   onChange={(event) => setHairColor(event.target.value)}
                   placeholder="bijv. donkerblond"
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="eyeColor">Oogkleur</Label>
+                <Select
+                  id="eyeColor"
+                  value={eyeColor}
+                  onChange={(event) => setEyeColor(event.target.value)}
+                >
+                  <option value="">— niet gespecificeerd —</option>
+                  {EYE_COLORS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="skinTone">Huidskleur</Label>
@@ -369,6 +408,15 @@ export function ProfileView({
                     </option>
                   ))}
                 </Select>
+              </div>
+              <div className="space-y-2 sm:col-span-2 lg:col-span-3">
+                <Label htmlFor="ethnicLook">Etnische look / herkomst</Label>
+                <Input
+                  id="ethnicLook"
+                  value={ethnicLook}
+                  onChange={(event) => setEthnicLook(event.target.value)}
+                  placeholder="bijv. Noord-Europees, Mediterraan, Zuid-Aziatisch, gemengd Indisch/Nederlands"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="wearsGlasses">Draagt een bril</Label>

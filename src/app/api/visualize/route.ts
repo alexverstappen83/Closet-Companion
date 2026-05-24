@@ -34,7 +34,7 @@ const bodySchema = z.object({
     .optional(),
 });
 
-const PROMPT_VERSION = "v4";
+const PROMPT_VERSION = "v5";
 const MAX_REFERENCE_PHOTOS = 4;
 
 function describeItem(item: {
@@ -109,10 +109,13 @@ export async function POST(request: NextRequest) {
       ageYears: true,
       heightCm: true,
       bodyBuild: true,
+      clothingSize: true,
       hairColor: true,
       hairLength: true,
+      hairTexture: true,
+      eyeColor: true,
       skinTone: true,
-      genderPresentation: true,
+      ethnicLook: true,
       wearsGlasses: true,
       facialHair: true,
       appearanceNotes: true,
@@ -172,7 +175,7 @@ export async function POST(request: NextRequest) {
       referenceImages,
       clothingItems,
       context: outfit.occasion ?? outfit.name,
-      personDescription: describePersonProfile(userProfile),
+      personBullets: describePersonProfile(userProfile),
       poseDescription: primary.poseDescription,
       backgroundPrompt: backgroundPreset.prompt || null,
     });

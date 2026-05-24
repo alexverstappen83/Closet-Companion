@@ -5,58 +5,74 @@ export type PersonProfileFields = Pick<
   | "ageYears"
   | "heightCm"
   | "bodyBuild"
+  | "clothingSize"
   | "hairColor"
   | "hairLength"
+  | "hairTexture"
+  | "eyeColor"
   | "skinTone"
-  | "genderPresentation"
+  | "ethnicLook"
   | "wearsGlasses"
   | "facialHair"
   | "appearanceNotes"
 >;
 
-/** Bouwt een natuurlijke, korte Nederlandse beschrijving van de persoon op
- *  basis van de profielvelden. Lege velden worden overgeslagen. Retourneert
- *  null als er niks ingevuld is — dan blijft de visualize-prompt onveranderd. */
+/** Bouwt een lijst korte bullets met aanvullende info over de persoon op basis
+ *  van de profielvelden. Bewust geen volzinnen die iets verklaren: het is
+ *  *aanvullende* informatie, geen overschrijving van wat het model op de foto
+ *  ziet. Lege velden worden overgeslagen. Retourneert null als er niks
+ *  ingevuld is — dan blijft de visualize-prompt onveranderd.
+ *
+ *  Let op: `genderPresentation` is met opzet weggelaten. De foto laat dit
+ *  altijd duidelijk zien; het in de prompt zetten kan alleen maar
+ *  tegenspraak veroorzaken als het profiel afwijkt van de foto. */
 export function describePersonProfile(
   profile: PersonProfileFields | null | undefined,
-): string | null {
+): string[] | null {
   if (!profile) return null;
 
-  const pieces: string[] = [];
+  const bullets: string[] = [];
 
-  const headline: string[] = [];
   if (profile.ageYears && profile.ageYears > 0 && profile.ageYears < 150) {
-    headline.push(`${profile.ageYears}-jarige`);
+    bullets.push(`leeftijd: ca. ${profile.ageYears} jaar`);
   }
-  if (profile.genderPresentation) {
-    headline.push(profile.genderPresentation);
-  } else {
-    headline.push("persoon");
-  }
-  if (headline.length) pieces.push(headline.join(" "));
-
   if (profile.heightCm && profile.heightCm > 100 && profile.heightCm < 230) {
     const meters = (profile.heightCm / 100).toFixed(2).replace(".", ",");
-    pieces.push(`${meters} m lang`);
+    bullets.push(`lengte: ${meters} m`);
   }
-  if (profile.bodyBuild) pieces.push(`${profile.bodyBuild} postuur`);
+  if (profile.bodyBuild) bullets.push(`postuur: ${profile.bodyBuild}`);
+  if (profile.clothingSize) {
+    bullets.push(`confectiemaat: ${profile.clothingSize}`);
+  }
 
   const hair: string[] = [];
   if (profile.hairLength) hair.push(profile.hairLength);
-  if (profile.hairColor) hair.push(`${profile.hairColor} haar`);
-  if (hair.length) pieces.push(hair.join(" "));
+  if (profile.hairTexture) hair.push(profile.hairTexture);
+  if (profile.hairColor) hair.push(profile.hairColor);
+  if (hair.length) bullets.push(`haar: ${hair.join(", ")}`);
 
-  if (profile.skinTone) pieces.push(`${profile.skinTone} huid`);
+  if (profile.eyeColor) bullets.push(`oogkleur: ${profile.eyeColor}`);
+  if (profile.skinTone) bullets.push(`huidskleur: ${profile.skinTone}`);
+  if (profile.ethnicLook?.trim()) {
+    bullets.push(`etnische look: ${profile.ethnicLook.trim()}`);
+  }
 
-  if (profile.wearsGlasses) pieces.push("draagt een bril");
-  if (profile.facialHair && profile.facialHair.trim().toLowerCase() !== "geen") {
-    pieces.push(profile.facialHair);
+  if (profile.wearsGlasses === true) bullets.push("draagt een bril");
+  if (profile.wearsGlasses === false) bullets.push("draagt geen bril");
+
+  if (profile.facialHair?.trim()) {
+    const value = profile.facialHair.trim();
+    if (value.toLowerCase() !== "geen") {
+      bullets.push(`gezichtsbeharing: ${value}`);
+    } else {
+      bullets.push("geen gezichtsbeharing");
+    }
   }
 
   if (profile.appearanceNotes?.trim()) {
-    pieces.push(profile.appearanceNotes.trim());
+    bullets.push(`overig: ${profile.appearanceNotes.trim()}`);
   }
 
-  if (pieces.length === 0) return null;
-  return pieces.join(", ");
+  if (bullets.length === 0) return null;
+  return bullets;
 }

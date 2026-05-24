@@ -331,8 +331,10 @@ export async function generateOutfitVisualization(params: {
   referenceImages: VisualizationImage[];
   clothingItems: VisualizationItem[];
   context?: string;
-  /** Vrije tekstbeschrijving van de persoon, samengesteld uit de profielvelden. */
-  personDescription?: string | null;
+  /** Bullets met aanvullende info over de persoon, samengesteld uit de
+   *  profielvelden. Worden gepresenteerd als hulpinformatie, niet als
+   *  feitelijke verklaring — de foto blijft leidend. */
+  personBullets?: string[] | null;
   /** Door GPT-4o Vision uit de primaire referentiefoto gehaalde pose-beschrijving. */
   poseDescription?: string | null;
   /** Beschrijving van de gewenste achtergrond. Bij undefined of lege string
@@ -368,53 +370,84 @@ export async function generateOutfitVisualization(params: {
       ? `foto ${itemsStart}`
       : `foto ${itemsStart} t/m ${itemsEnd}`;
 
-  const personLine = params.personDescription?.trim()
-    ? `De persoon op de foto's is een ${params.personDescription.trim()}. ` +
-      "Houd leeftijd, postuur en lichaamsbouw consistent met deze beschrijving."
+  const personBulletsBlock = params.personBullets?.length
+    ? [
+        "AANVULLENDE INFO over de persoon (alleen gebruiken als de foto's iets",
+        "niet duidelijk laten zien; nooit gebruiken om iets anders weer te",
+        "geven dan wat zichtbaar is op de foto's):",
+        ...params.personBullets.map((entry) => `- ${entry}`),
+      ].join("\n")
     : "";
+
   const poseLine = params.poseDescription?.trim()
     ? `Pose en framing zoals op de primaire persoon-foto: ${params.poseDescription.trim()} ` +
       "Volg deze pose, framing en camerahoek zo nauwkeurig mogelijk."
     : "";
+
   const backgroundLine = params.backgroundPrompt?.trim()
     ? `Achtergrond: ${params.backgroundPrompt.trim()}`
     : "";
 
   const prompt = [
-    `Je krijgt ${referenceCount + itemsCount} foto's mee, in deze volgorde:`,
-    `- ${refRange}: foto's van de persoon.`,
-    `- ${itemsRange}: foto's van kledingstukken (één foto per kledingstuk).`,
+    "TAAK: maak één fotorealistische afbeelding van dezelfde persoon zoals",
+    "te zien op de referentiefoto's, gekleed in de outfit die hieronder",
+    "beschreven en op foto getoond wordt.",
     "",
-    personLine,
-    poseLine,
+    "LEIDEND PRINCIPE — de foto is de waarheid:",
+    "De persoon-foto's zijn altijd leidend. Gezicht, geslacht, etniciteit,",
+    "haartextuur, oogkleur, gelaatstrekken en alle zichtbare lichaamskenmerken",
+    "moeten exact overeenkomen met wat op de foto's te zien is. Wijk hier",
+    "nooit van af. Tekstuele beschrijvingen zijn alleen bedoeld als hulp bij",
+    "onduidelijkheid — nooit om iets anders weer te geven dan zichtbaar is.",
     "",
-    `Gebruik de persoon-foto's (${refRange}) alleen voor:`,
-    "- het uiterlijk en de lichaamsverhoudingen van de persoon",
+    "SILHOUET — vaste regel, één toegestane uitzondering op het neutrale beeld:",
+    "Behoud het silhouet, postuur en de lichaamsbouw van de persoon zoals op",
+    "de referentiefoto's. Maak de persoon NOOIT zwaarder, voller, ouder of",
+    "minder fit dan op de foto's. Bij twijfel: render slank, goed geproportioneerd",
+    "en jeugdig — nooit andersom. Dit is de enige bewuste afwijking richting een",
+    "fotomodel-look; verder volg je de foto exact.",
+    "",
+    `INPUTFOTO'S — je krijgt ${referenceCount + itemsCount} foto's, in deze volgorde:`,
+    `- ${refRange}: foto's van de persoon (leidend voor uiterlijk en silhouet).`,
+    `- ${itemsRange}: foto's van kledingstukken (bron voor de outfit).`,
+    "",
+    `Gebruik de persoon-foto's (${refRange}) voor:`,
+    "- het exacte uiterlijk, gelaat, haar, huid en lichaamsverhoudingen",
     "- de pose en lichaamshouding",
     backgroundLine
-      ? "- het kader (de achtergrond wordt apart hieronder beschreven)"
+      ? "- het kader en de belichting (de achtergrond wordt apart hieronder beschreven)"
       : "- de achtergrond, het kader en de belichting",
     "Negeer de kleding op deze foto's volledig.",
+    "",
+    poseLine,
     "",
     `Gebruik de kledingfoto's (${itemsRange}) als bron voor hoe elk kledingstuk eruitziet:`,
     "- de kleur(en) en kleurverhoudingen",
     "- alle zichtbare patronen, opdruk en grafische details",
     "- de stof, structuur, glans en details als knopen, naden en zakken",
-    "Pas alleen de pasvorm en val aan op het lichaam en de pose van de persoon.",
-    "Geef het kledingstuk weer zoals het op zijn eigen foto te zien is, zonder",
-    "extra details te verzinnen.",
+    "Pas alleen pasvorm en val aan op het silhouet en de pose van de persoon.",
+    "Wijzig het lichaam zelf niet om de kleding te laten passen — het silhouet",
+    "uit de persoon-foto's blijft vast.",
     "",
-    "De outfit bestaat uit precies deze kledingstukken (per item de bijbehorende foto):",
+    "OUTFIT — precies deze kledingstukken (per item de bijbehorende foto):",
     itemsList,
-    "",
     "Voeg geen kleding of accessoires toe die niet in deze lijst staan.",
+    "",
     params.context
-      ? `Gelegenheid waar deze outfit voor bedoeld is: ${params.context}.`
+      ? `Gelegenheid: ${params.context}.`
       : "",
     backgroundLine,
     "",
-    "Resultaat: één natuurlijke fotorealistische afbeelding van dezelfde persoon",
-    "in deze outfit, met realistische pasvorm en natuurlijke belichting.",
+    personBulletsBlock,
+    "",
+    "RESULTAAT: één natuurlijke fotorealistische afbeelding van dezelfde",
+    "persoon (zoals op de referentiefoto's, met de hierboven beschreven",
+    "silhouet-instructie) in de outfit, met realistische pasvorm en",
+    "natuurlijke belichting.",
+    "",
+    "HERHALING van de twee belangrijkste regels:",
+    "1. Gezicht, geslacht, etniciteit en uiterlijk volgen exact de referentiefoto's.",
+    "2. Silhouet volgt de referentiefoto's; bij twijfel slanker, nooit zwaarder.",
   ]
     .filter(Boolean)
     .join("\n");

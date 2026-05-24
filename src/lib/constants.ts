@@ -100,6 +100,22 @@ export const HAIR_LENGTHS = [
   "lang",
 ] as const;
 
+export const HAIR_TEXTURES = [
+  "steil",
+  "golvend",
+  "krullend",
+  "kroezend",
+] as const;
+
+export const EYE_COLORS = [
+  "blauw",
+  "groen",
+  "grijs",
+  "lichtbruin/hazelnoot",
+  "bruin",
+  "donkerbruin/zwart",
+] as const;
+
 export const SKIN_TONES = [
   "licht",
   "medium",

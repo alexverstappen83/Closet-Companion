@@ -7,8 +7,10 @@ import { z } from "zod";
 import type { ActionResult } from "@/lib/action-result";
 import {
   BODY_BUILDS,
+  EYE_COLORS,
   GENDER_PRESENTATIONS,
   HAIR_LENGTHS,
+  HAIR_TEXTURES,
   SKIN_TONES,
 } from "@/lib/constants";
 import { apiUser } from "@/lib/guards";
@@ -36,9 +38,13 @@ const personProfileSchema = z.object({
   ageYears: z.number().int().min(1).max(149).nullable().optional(),
   heightCm: z.number().int().min(100).max(229).nullable().optional(),
   bodyBuild: z.string().trim().max(60).nullable().optional(),
+  clothingSize: z.string().trim().max(20).nullable().optional(),
   hairColor: z.string().trim().max(60).nullable().optional(),
   hairLength: z.string().trim().max(60).nullable().optional(),
+  hairTexture: z.string().trim().max(60).nullable().optional(),
+  eyeColor: z.string().trim().max(60).nullable().optional(),
   skinTone: z.string().trim().max(60).nullable().optional(),
+  ethnicLook: z.string().trim().max(120).nullable().optional(),
   genderPresentation: z.string().trim().max(60).nullable().optional(),
   wearsGlasses: z.boolean().nullable().optional(),
   facialHair: z.string().trim().max(60).nullable().optional(),
@@ -49,6 +55,8 @@ export type PersonProfileInput = z.infer<typeof personProfileSchema>;
 
 const normalizeBuild = oneOf(BODY_BUILDS);
 const normalizeHairLength = oneOf(HAIR_LENGTHS);
+const normalizeHairTexture = oneOf(HAIR_TEXTURES);
+const normalizeEyeColor = oneOf(EYE_COLORS);
 const normalizeSkinTone = oneOf(SKIN_TONES);
 const normalizeGender = oneOf(GENDER_PRESENTATIONS);
 
@@ -73,9 +81,13 @@ export async function updatePersonProfile(
       ageYears: data.ageYears ?? null,
       heightCm: data.heightCm ?? null,
       bodyBuild: normalizeBuild(data.bodyBuild ?? null),
+      clothingSize: trimmedOrNull(data.clothingSize ?? null),
       hairColor: trimmedOrNull(data.hairColor ?? null),
       hairLength: normalizeHairLength(data.hairLength ?? null),
+      hairTexture: normalizeHairTexture(data.hairTexture ?? null),
+      eyeColor: normalizeEyeColor(data.eyeColor ?? null),
       skinTone: normalizeSkinTone(data.skinTone ?? null),
+      ethnicLook: trimmedOrNull(data.ethnicLook ?? null),
       genderPresentation: normalizeGender(data.genderPresentation ?? null),
       wearsGlasses: data.wearsGlasses ?? null,
       facialHair: trimmedOrNull(data.facialHair ?? null),

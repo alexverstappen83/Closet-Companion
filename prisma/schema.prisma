@@ -35,14 +35,19 @@ model User {
   isActive     Boolean  @default(true)
 
   // Persoonsprofiel voor AI-visualisaties. Optionele velden — als ze ingevuld
-  // zijn worden ze als tekstanker meegegeven aan gpt-image-1, zodat de
-  // identiteit van de persoon tussen generaties consistenter blijft.
+  // zijn worden ze in een "aanvullende info"-blok aan gpt-image-1 meegegeven.
+  // De foto blijft altijd leidend; deze tekstvelden zijn alleen tie-breakers
+  // voor details die de foto onduidelijk laat.
   ageYears           Int?
   heightCm           Int?
   bodyBuild          String?
+  clothingSize       String?
   hairColor          String?
   hairLength         String?
+  hairTexture        String?
+  eyeColor           String?
   skinTone           String?
+  ethnicLook         String?
   genderPresentation String?
   wearsGlasses       Boolean?
   facialHair         String?
